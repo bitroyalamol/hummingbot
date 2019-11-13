@@ -19,6 +19,7 @@ BITTREX_ENDPOINT = "https://api.bittrex.com/v3/markets"
 DOLOMITE_ENDPOINT = "https://exchange-api.dolomite.io/v1/markets"
 BITROYAL_ENDPOINT = "https://apicoinmartprod.alphapoint.com:8443/AP/GetInstruments?OMSId=1"
 
+
 API_CALL_TIMEOUT = 5
 
 

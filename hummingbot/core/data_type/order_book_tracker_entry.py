@@ -11,6 +11,7 @@ from hummingbot.market.dolomite.dolomite_active_order_tracker import DolomiteAct
 from hummingbot.market.bitroyal.bitroyal_active_order_tracker import BitroyalActiveOrderTracker
 from hummingbot.market.bitcoin_com.bitcoin_com_active_order_tracker import BitcoinComActiveOrderTracker
 
+
 class OrderBookTrackerEntry:
     def __init__(self, trading_pair: str, timestamp: float, order_book: OrderBook):
         self._trading_pair = trading_pair
