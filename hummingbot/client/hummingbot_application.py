@@ -15,6 +15,7 @@ from hummingbot.logger.application_warning import ApplicationWarning
 from hummingbot.market.binance.binance_market import BinanceMarket
 from hummingbot.market.bittrex.bittrex_market import BittrexMarket
 from hummingbot.market.coinbase_pro.coinbase_pro_market import CoinbaseProMarket
+from hummingbot.market.bitroyal.bitroyal_market import BitroyalMarket
 from hummingbot.market.ddex.ddex_market import DDEXMarket
 from hummingbot.market.huobi.huobi_market import HuobiMarket
 from hummingbot.market.market_base import MarketBase
@@ -55,6 +56,7 @@ MARKET_CLASSES = {
     "bamboo_relay": BambooRelayMarket,
     "binance": BinanceMarket,
     "coinbase_pro": CoinbaseProMarket,
+    "bitroyal": BitroyalMarket,
     "ddex": DDEXMarket,
     "huobi": HuobiMarket,
     "idex": IDEXMarket,
@@ -309,6 +311,15 @@ class HummingbotApplication(*commands):
                 market = CoinbaseProMarket(coinbase_pro_api_key,
                                            coinbase_pro_secret_key,
                                            coinbase_pro_passphrase,
+                                           symbols=symbols,
+                                           trading_required=self._trading_required)
+
+            elif market_name == "bitroyal":
+                bitroyal_api_key = global_config_map.get("bitroyal_api_key").value
+                bitroyal_secret_key = global_config_map.get("bitroyal_secret_key").value
+
+                market = BitroyalMarket(bitroyal_api_key,
+                                           bitroyal_secret_key,
                                            symbols=symbols,
                                            trading_required=self._trading_required)
             elif market_name == "huobi":
