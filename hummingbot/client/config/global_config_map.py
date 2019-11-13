@@ -136,6 +136,16 @@ global_config_map = {
                   prompt="Enter your Coinbase passphrase >>> ",
                   required_if=using_exchange("coinbase_pro"),
                   is_secure=True),
+    "bitroyal_api_key":
+        ConfigVar(key="bitroyal_api_key",
+                  prompt="Enter your Bitroyal API key >>> ",
+                  required_if=using_exchange("bitroyal"),
+                  is_secure=True),
+    "bitroyal_secret_key":
+        ConfigVar(key="bitroyal_secret_key",
+                  prompt="Enter your Bitroyal secret key >>> ",
+                  required_if=using_exchange("bitroyal"),
+                  is_secure=True),
     "huobi_api_key":
         ConfigVar(key="huobi_api_key",
                   prompt="Enter your Huobi API key >>> ",

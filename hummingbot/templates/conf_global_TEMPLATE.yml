@@ -15,6 +15,9 @@ binance_api_secret: null
 bittrex_api_key: null
 bittrex_secret_key: null
 
+bitroyal_api_key: null
+bitroyal_secret_key: null
+
 coinbase_pro_api_key: null
 coinbase_pro_secret_key: null
 coinbase_pro_passphrase: null
