@@ -143,7 +143,7 @@ class TradingPairFetcher:
                 if response.status == 200:
                     try:
                         markets = await response.json()
-                        raw_trading_pairs: List[str] = list(map(lambda details: details.get('id'), markets))
+                        raw_trading_pairs: List[str] = list(map(lambda details: details.get('Symbol'), markets))
                         return [BitroyalMarket.convert_from_exchange_trading_pair(p) for p in raw_trading_pairs]
                     except Exception:
                         pass
