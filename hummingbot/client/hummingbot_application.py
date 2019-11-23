@@ -340,6 +340,15 @@ class HummingbotApplication(*commands):
                                            bitroyal_secret_key,
                                            symbols=symbols,
                                            trading_required=self._trading_required)
+
+            elif market_name == "bitroyal":
+                bitroyal_api_key = global_config_map.get("bitroyal_api_key").value
+                bitroyal_secret_key = global_config_map.get("bitroyal_secret_key").value
+
+                market = BitroyalMarket(bitroyal_api_key,
+                                           bitroyal_secret_key,
+                                           symbols=symbols,
+                                           trading_required=self._trading_required)
             elif market_name == "huobi":
                 huobi_api_key = global_config_map.get("huobi_api_key").value
                 huobi_secret_key = global_config_map.get("huobi_secret_key").value
