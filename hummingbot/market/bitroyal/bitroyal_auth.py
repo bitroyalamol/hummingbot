@@ -14,6 +14,13 @@ class BitroyalAuth:
     def generate_auth_dict(self) -> Dict[str, any]:
         pass
 
+    @staticmethod
+    def generate_incremented_index(self) -> int:
+        index = 2
+        while True:
+            yield index
+            index = index + 2
+
     def get_headers(self) -> Dict[str, any]:
         """
         Generates authentication headers required by BIROYAL

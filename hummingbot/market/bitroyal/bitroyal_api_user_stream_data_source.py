@@ -17,7 +17,7 @@ from hummingbot.logger import HummingbotLogger
 from hummingbot.core.data_type.order_book_message import OrderBookMessage
 from hummingbot.market.bitroyal.bitroyal_order_book import BitroyalOrderBook
 
-BITROYAL_REST_URL = "https://apicoinmartprod.alphapoint.com:8443/API"
+BITROYAL_REST_URL = "https://apicoinmartprod.alphapoint.com:8443/AP"
 BITROYAL_WS_FEED = "wss://apicoinmartprod.alphapoint.com/WSGateway"
 MAX_RETRIES = 20
 NaN = float("nan")
@@ -28,17 +28,17 @@ class BitroyalAPIUserStreamDataSource(UserStreamTrackerDataSource):
     MESSAGE_TIMEOUT = 30.0
     PING_TIMEOUT = 10.0
 
-    _cbpausds_logger: Optional[HummingbotLogger] = None
+    _brausds_logger: Optional[HummingbotLogger] = None
 
     @classmethod
     def logger(cls) -> HummingbotLogger:
-        if cls._cbpausds_logger is None:
-            cls._cbpausds_logger = logging.getLogger(__name__)
-        return cls._cbpausds_logger
+        if cls._brausds_logger is None:
+            cls._brausds_logger = logging.getLogger(__name__)
+        return cls._brausds_logger
 
-    def __init__(self, bitroyal_auth: BitroyalAuth, symbols: Optional[List[str]] = []):
+    def __init__(self, bitroyal_auth: BitroyalAuth, trading_pairs: Optional[List[str]] = []):
         self._bitroyal_auth: BitroyalAuth = bitroyal_auth
-        self._symbols = symbols
+        self._trading_pairs = trading_pairs
         self._current_listen_key = None
         self._listen_for_user_stream_task = None
         super().__init__()
@@ -64,15 +64,19 @@ class BitroyalAPIUserStreamDataSource(UserStreamTrackerDataSource):
                 async with websockets.connect(BITROYAL_WS_FEED) as ws:
                     ws: websockets.WebSocketClientProtocol = ws
                     subscribe_request: Dict[str, any] = {
-                        "type": "subscribe",
-                        "product_ids": self._symbols,
-                        "channels": ["user"]
+                        "m": 0,
+                        "i": 0,
+                        "n": "AuthenticateUser",
+                        "o": ""
                     }
-                    auth_dict: Dict[str] = self._bitroyal_auth.generate_auth_dict("get", "/users/self/verify", "")
-                    subscribe_request.update(auth_dict)
+                    auth_dict = '{"UserName": "Br.0002test", "Password": "bitWelcome123"}'
+                    index = BitroyalAuth.generate_incremented_index()
+                    subscribe_request["i"] = index
+                    subscribe_request['o'] = auth_dict
                     await ws.send(ujson.dumps(subscribe_request))
                     async for raw_msg in self._inner_messages(ws):
                         msg = ujson.loads(raw_msg)
+                        print(msg)
                         msg_type: str = msg.get("type", None)
                         if msg_type is None:
                             raise ValueError(f"Bitroyal Websocket message does not contain a type - {msg}")
