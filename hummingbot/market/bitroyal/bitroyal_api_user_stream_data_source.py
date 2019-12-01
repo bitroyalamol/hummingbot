@@ -69,14 +69,13 @@ class BitroyalAPIUserStreamDataSource(UserStreamTrackerDataSource):
                         "n": "AuthenticateUser",
                         "o": ""
                     }
-                    auth_dict = '{"UserName": "Br.0002test", "Password": "bitWelcome123"}'
+                    auth_dict = 'f{"UserName": "{bitroyal_api_key}", "Password": "{bitroyal_secret_key}"}'
                     index = BitroyalAuth.generate_incremented_index()
                     subscribe_request["i"] = index
                     subscribe_request['o'] = auth_dict
                     await ws.send(ujson.dumps(subscribe_request))
                     async for raw_msg in self._inner_messages(ws):
                         msg = ujson.loads(raw_msg)
-                        print(msg)
                         msg_type: str = msg.get("type", None)
                         if msg_type is None:
                             raise ValueError(f"Bitroyal Websocket message does not contain a type - {msg}")
