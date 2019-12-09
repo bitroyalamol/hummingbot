@@ -114,7 +114,7 @@ cdef class BitroyalMarket(MarketBase):
     API_CALL_TIMEOUT = 10.0
     UPDATE_ORDERS_INTERVAL = 10.0
 
-    BITROYAL_API_ENDPOINT = "https://apicoinmartprod.alphapoint.com:8443/API"
+    BITROYAL_API_ENDPOINT = "https://appicoinmartprod.alphapoint.com:8443/AP"
 
     @classmethod
     def logger(cls) -> HummingbotLogger:
@@ -126,19 +126,18 @@ cdef class BitroyalMarket(MarketBase):
     def __init__(self,
                  bitroyal_api_key: str,
                  bitroyal_secret_key: str,
-                 bitroyal_passphrase: str,
                  poll_interval: float = 5.0,    # interval which the class periodically pulls status from the rest API
                  order_book_tracker_data_source_type: OrderBookTrackerDataSourceType =
                  OrderBookTrackerDataSourceType.EXCHANGE_API,
-                 symbols: Optional[List[str]] = None,
+                 trading_pairs: Optional[List[str]] = None,
                  trading_required: bool = True):
         super().__init__()
         self._trading_required = trading_required
-        self._bitroyal_auth = BitroyalAuth(bitroyal_api_key, bitroyal_secret_key, bitroyal_passphrase)
+        self._bitroyal_auth = BitroyalAuth(bitroyal_api_key, bitroyal_secret_key)
         self._order_book_tracker = BitroyalOrderBookTracker(data_source_type=order_book_tracker_data_source_type,
-                                                               symbols=symbols)
+                                                               trading_pairs=trading_pairs)
         self._user_stream_tracker = BitroyalUserStreamTracker(bitroyal_auth=self._bitroyal_auth,
-                                                                 symbols=symbols)
+                                                                 trading_pairs=trading_pairs)
         self._ev_loop = asyncio.get_event_loop()
         self._poll_notifier = asyncio.Event()
         self._last_timestamp = 0
@@ -176,7 +175,7 @@ cdef class BitroyalMarket(MarketBase):
     def bitroyal_auth(self) -> BitroyalAuth:
         """
         :return: BitroyalAuth class (This is unique to bitroyal market).
-        Read more here: https://bitroyalexchange.com/public-api
+        Read more here: https://docs.bitroyal.com/?python#signing-a-message
         """
         return self._bitroyal_auth
 
@@ -363,8 +362,8 @@ cdef class BitroyalMarket(MarketBase):
         # There is no API for checking user's fee tier
         # Fee info from https://bitroyalexchange.com/fees
         cdef:
-            object maker_fee = Decimal("0.0015")
-            object taker_fee = Decimal("0.0025")
+            object maker_fee = Decimal("0.0085")
+            object taker_fee = Decimal("0.01")
 
         return TradeFee(percent=maker_fee if order_type is OrderType.LIMIT else taker_fee)
 
@@ -409,7 +408,7 @@ cdef class BitroyalMarket(MarketBase):
             trading_rules_list = self._format_trading_rules(product_info)
             self._trading_rules.clear()
             for trading_rule in trading_rules_list:
-                self._trading_rules[trading_rule.symbol] = trading_rule
+                self._trading_rules[trading_rule.trading_pair] = trading_rule
 
     def _format_trading_rules(self, raw_trading_rules: List[Any]) -> List[TradingRule]:
         """
@@ -420,14 +419,14 @@ cdef class BitroyalMarket(MarketBase):
             list retval = []
         for rule in raw_trading_rules:
             try:
-                symbol = rule.get("id")
-                retval.append(TradingRule(symbol,
+                trading_pair = rule.get("id")
+                retval.append(TradingRule(trading_pair,
                                           min_price_increment=Decimal(rule.get("quote_increment")),
                                           min_order_size=Decimal(rule.get("base_min_size")),
                                           max_order_size=Decimal(rule.get("base_max_size")),
                                           supports_market_orders=(not rule.get("limit_only"))))
             except Exception:
-                self.logger().error(f"Error parsing the symbol rule {rule}. Skipping.", exc_info=True)
+                self.logger().error(f"Error parsing the trading_pair rule {rule}. Skipping.", exc_info=True)
         return retval
 
     async def _update_order_status(self):
@@ -471,7 +470,7 @@ cdef class BitroyalMarket(MarketBase):
                 order_filled_event = OrderFilledEvent(
                     self._current_timestamp,
                     tracked_order.client_order_id,
-                    tracked_order.symbol,
+                    tracked_order.trading_pair,
                     tracked_order.trade_type,
                     order_type,
                     execute_price,
@@ -604,7 +603,7 @@ cdef class BitroyalMarket(MarketBase):
                                          OrderFilledEvent(
                                              self._current_timestamp,
                                              tracked_order.client_order_id,
-                                             tracked_order.symbol,
+                                             tracked_order.trading_pair,
                                              tracked_order.trade_type,
                                              tracked_order.order_type,
                                              execute_price,
@@ -650,7 +649,8 @@ cdef class BitroyalMarket(MarketBase):
                                                                      tracked_order.fee_paid,
                                                                      tracked_order.order_type))
                     self.c_stop_tracking_order(tracked_order.client_order_id)
-                else:  # reason == "canceled":
+
+                elif content.get("reason") == "canceled":  # reason == "canceled":
                     execute_amount_diff = 0
                     tracked_order.last_state = "canceled"
                     self.c_trigger_event(self.MARKET_ORDER_CANCELLED_EVENT_TAG,
@@ -664,7 +664,7 @@ cdef class BitroyalMarket(MarketBase):
                 self.logger().error("Unexpected error in user stream listener loop.", exc_info=True)
                 await asyncio.sleep(5.0)
 
-    async def place_order(self, order_id: str, symbol: str, amount: Decimal, is_buy: bool, order_type: OrderType,
+    async def place_order(self, order_id: str, trading_pair: str, amount: Decimal, is_buy: bool, order_type: OrderType,
                           price: Decimal):
         """
         Async wrapper for placing orders through the rest API.
@@ -672,9 +672,9 @@ cdef class BitroyalMarket(MarketBase):
         """
         path_url = "/orders"
         data = {
-            "price": float(price),
-            "size": float(amount),
-            "product_id": symbol,
+            "price": f"{price:f}",
+            "size": f"{amount:f}",
+            "product_id": trading_pair,
             "side": "buy" if is_buy else "sell",
             "type": "limit" if order_type is OrderType.LIMIT else "market",
         }
@@ -684,7 +684,7 @@ cdef class BitroyalMarket(MarketBase):
 
     async def execute_buy(self,
                           order_id: str,
-                          symbol: str,
+                          trading_pair: str,
                           amount: Decimal,
                           order_type: OrderType,
                           price: Optional[Decimal] = s_decimal_0):
@@ -693,28 +693,28 @@ cdef class BitroyalMarket(MarketBase):
         and submit an API request to place a buy order
         """
         cdef:
-            TradingRule trading_rule = self._trading_rules[symbol]
+            TradingRule trading_rule = self._trading_rules[trading_pair]
 
-        decimal_amount = self.quantize_order_amount(symbol, amount)
-        decimal_price = self.quantize_order_price(symbol, price)
+        decimal_amount = self.quantize_order_amount(trading_pair, amount)
+        decimal_price = self.quantize_order_price(trading_pair, price)
         if decimal_amount < trading_rule.min_order_size:
             raise ValueError(f"Buy order amount {decimal_amount} is lower than the minimum order size "
                              f"{trading_rule.min_order_size}.")
 
         try:
-            self.c_start_tracking_order(order_id, symbol, order_type, TradeType.BUY, decimal_price, decimal_amount)
-            order_result = await self.place_order(order_id, symbol, decimal_amount, True, order_type, decimal_price)
+            self.c_start_tracking_order(order_id, trading_pair, order_type, TradeType.BUY, decimal_price, decimal_amount)
+            order_result = await self.place_order(order_id, trading_pair, decimal_amount, True, order_type, decimal_price)
 
             exchange_order_id = order_result["id"]
             tracked_order = self._in_flight_orders.get(order_id)
             if tracked_order is not None:
-                self.logger().info(f"Created {order_type} buy order {order_id} for {decimal_amount} {symbol}.")
+                self.logger().info(f"Created {order_type} buy order {order_id} for {decimal_amount} {trading_pair}.")
                 tracked_order.update_exchange_order_id(exchange_order_id)
 
             self.c_trigger_event(self.MARKET_BUY_ORDER_CREATED_EVENT_TAG,
                                  BuyOrderCreatedEvent(self._current_timestamp,
                                                       order_type,
-                                                      symbol,
+                                                      trading_pair,
                                                       decimal_amount,
                                                       decimal_price,
                                                       order_id))
@@ -725,7 +725,7 @@ cdef class BitroyalMarket(MarketBase):
             order_type_str = "MARKET" if order_type == OrderType.MARKET else "LIMIT"
             self.logger().network(
                 f"Error submitting buy {order_type_str} order to Bitroyal for "
-                f"{decimal_amount} {symbol} {price}.",
+                f"{decimal_amount} {trading_pair} {price}.",
                 exc_info=True,
                 app_warning_msg="Failed to submit buy order to Bitroyal. "
                                 "Check API key and network connection."
@@ -733,7 +733,7 @@ cdef class BitroyalMarket(MarketBase):
             self.c_trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
                                  MarketOrderFailureEvent(self._current_timestamp, order_id, order_type))
 
-    cdef str c_buy(self, str symbol, object amount, object order_type=OrderType.MARKET, object price=s_decimal_0,
+    cdef str c_buy(self, str trading_pair, object amount, object order_type=OrderType.MARKET, object price=s_decimal_0,
                    dict kwargs={}):
         """
         *required
@@ -741,14 +741,14 @@ cdef class BitroyalMarket(MarketBase):
         """
         cdef:
             int64_t tracking_nonce = <int64_t>(time.time() * 1e6)
-            str order_id = str(f"buy-{symbol}-{tracking_nonce}")
+            str order_id = str(f"buy-{trading_pair}-{tracking_nonce}")
 
-        safe_ensure_future(self.execute_buy(order_id, symbol, amount, order_type, price))
+        safe_ensure_future(self.execute_buy(order_id, trading_pair, amount, order_type, price))
         return order_id
 
     async def execute_sell(self,
                            order_id: str,
-                           symbol: str,
+                           trading_pair: str,
                            amount: Decimal,
                            order_type: OrderType,
                            price: Optional[Decimal] = s_decimal_0):
@@ -757,28 +757,28 @@ cdef class BitroyalMarket(MarketBase):
         and submit an API request to place a sell order
         """
         cdef:
-            TradingRule trading_rule = self._trading_rules[symbol]
+            TradingRule trading_rule = self._trading_rules[trading_pair]
 
-        decimal_amount = self.quantize_order_amount(symbol, amount)
-        decimal_price = self.quantize_order_price(symbol, price)
+        decimal_amount = self.quantize_order_amount(trading_pair, amount)
+        decimal_price = self.quantize_order_price(trading_pair, price)
         if decimal_amount < trading_rule.min_order_size:
             raise ValueError(f"Sell order amount {decimal_amount} is lower than the minimum order size "
                              f"{trading_rule.min_order_size}.")
 
         try:
-            self.c_start_tracking_order(order_id, symbol, order_type, TradeType.SELL, decimal_price, decimal_amount)
-            order_result = await self.place_order(order_id, symbol, decimal_amount, False, order_type, decimal_price)
+            self.c_start_tracking_order(order_id, trading_pair, order_type, TradeType.SELL, decimal_price, decimal_amount)
+            order_result = await self.place_order(order_id, trading_pair, decimal_amount, False, order_type, decimal_price)
 
             exchange_order_id = order_result["id"]
             tracked_order = self._in_flight_orders.get(order_id)
             if tracked_order is not None:
-                self.logger().info(f"Created {order_type} sell order {order_id} for {decimal_amount} {symbol}.")
+                self.logger().info(f"Created {order_type} sell order {order_id} for {decimal_amount} {trading_pair}.")
                 tracked_order.update_exchange_order_id(exchange_order_id)
 
             self.c_trigger_event(self.MARKET_SELL_ORDER_CREATED_EVENT_TAG,
                                  SellOrderCreatedEvent(self._current_timestamp,
                                                        order_type,
-                                                       symbol,
+                                                       trading_pair,
                                                        decimal_amount,
                                                        decimal_price,
                                                        order_id))
@@ -789,7 +789,7 @@ cdef class BitroyalMarket(MarketBase):
             order_type_str = "MARKET" if order_type == OrderType.MARKET else "LIMIT"
             self.logger().network(
                 f"Error submitting sell {order_type_str} order to Bitroyal for "
-                f"{decimal_amount} {symbol} {price}.",
+                f"{decimal_amount} {trading_pair} {price}.",
                 exc_info=True,
                 app_warning_msg="Failed to submit sell order to Bitroyal. "
                                 "Check API key and network connection."
@@ -797,7 +797,11 @@ cdef class BitroyalMarket(MarketBase):
             self.c_trigger_event(self.MARKET_ORDER_FAILURE_EVENT_TAG,
                                  MarketOrderFailureEvent(self._current_timestamp, order_id, order_type))
 
-    cdef str c_sell(self, str symbol, object amount, object order_type=OrderType.MARKET, object price=s_decimal_0,
+    cdef str c_sell(self,
+                    str trading_pair,
+                    object amount,
+                    object order_type=OrderType.MARKET,
+                    object price=s_decimal_0,
                     dict kwargs={}):
         """
         *required
@@ -805,18 +809,18 @@ cdef class BitroyalMarket(MarketBase):
         """
         cdef:
             int64_t tracking_nonce = <int64_t>(time.time() * 1e6)
-            str order_id = str(f"sell-{symbol}-{tracking_nonce}")
-        safe_ensure_future(self.execute_sell(order_id, symbol, amount, order_type, price))
+            str order_id = str(f"sell-{trading_pair}-{tracking_nonce}")
+        safe_ensure_future(self.execute_sell(order_id, trading_pair, amount, order_type, price))
         return order_id
 
-    async def execute_cancel(self, symbol: str, order_id: str):
+    async def execute_cancel(self, trading_pair: str, order_id: str):
         """
         Function that makes API request to cancel an active order
         """
         try:
             exchange_order_id = await self._in_flight_orders.get(order_id).get_exchange_order_id()
             path_url = f"/orders/{exchange_order_id}"
-            [cancelled_id] = await self._api_request("delete", path_url=path_url)
+            cancelled_id = await self._api_request("delete", path_url=path_url)
             if cancelled_id == exchange_order_id:
                 self.logger().info(f"Successfully cancelled order {order_id}.")
                 self.c_stop_tracking_order(order_id)
@@ -842,12 +846,12 @@ cdef class BitroyalMarket(MarketBase):
             )
         return None
 
-    cdef c_cancel(self, str symbol, str order_id):
+    cdef c_cancel(self, str trading_pair, str order_id):
         """
         *required
         Synchronous wrapper that schedules cancelling an order.
         """
-        safe_ensure_future(self.execute_cancel(symbol, order_id))
+        safe_ensure_future(self.execute_cancel(trading_pair, order_id))
         return order_id
 
     async def cancel_all(self, timeout_seconds: float) -> List[CancellationResult]:
@@ -858,7 +862,7 @@ cdef class BitroyalMarket(MarketBase):
         :returns: List of CancellationResult which indicates whether each order is successfully cancelled.
         """
         incomplete_orders = [o for o in self._in_flight_orders.values() if not o.is_done]
-        tasks = [self.execute_cancel(o.symbol, o.client_order_id) for o in incomplete_orders]
+        tasks = [self.execute_cancel(o.trading_pair, o.client_order_id) for o in incomplete_orders]
         order_id_set = set([o.client_order_id for o in incomplete_orders])
         successful_cancellations = []
 
@@ -1026,20 +1030,20 @@ cdef class BitroyalMarket(MarketBase):
         safe_ensure_future(self.execute_withdraw(tracking_id, to_address, currency, amount))
         return tracking_id
 
-    cdef OrderBook c_get_order_book(self, str symbol):
+    cdef OrderBook c_get_order_book(self, str trading_pair):
         """
         :returns: OrderBook for a specific trading pair
         """
         cdef:
             dict order_books = self._order_book_tracker.order_books
 
-        if symbol not in order_books:
-            raise ValueError(f"No order book exists for '{symbol}'.")
-        return order_books[symbol]
+        if trading_pair not in order_books:
+            raise ValueError(f"No order book exists for '{trading_pair}'.")
+        return order_books[trading_pair]
 
     cdef c_start_tracking_order(self,
                                 str client_order_id,
-                                str symbol,
+                                str trading_pair,
                                 object order_type,
                                 object trade_type,
                                 object price,
@@ -1050,7 +1054,7 @@ cdef class BitroyalMarket(MarketBase):
         self._in_flight_orders[client_order_id] = BitroyalInFlightOrder(
             client_order_id,
             None,
-            symbol,
+            trading_pair,
             order_type,
             trade_type,
             price,
@@ -1071,40 +1075,40 @@ cdef class BitroyalMarket(MarketBase):
         self.c_trigger_event(self.MARKET_TRANSACTION_FAILURE_EVENT_TAG,
                              MarketTransactionFailureEvent(self._current_timestamp, tracking_id))
 
-    cdef object c_get_order_price_quantum(self, str symbol, object price):
+    cdef object c_get_order_price_quantum(self, str trading_pair, object price):
         """
         *required
         Get the minimum increment interval for price
         :return: Min order price increment in Decimal format
         """
         cdef:
-            TradingRule trading_rule = self._trading_rules[symbol]
+            TradingRule trading_rule = self._trading_rules[trading_pair]
         return trading_rule.min_price_increment
 
-    cdef object c_get_order_size_quantum(self, str symbol, object order_size):
+    cdef object c_get_order_size_quantum(self, str trading_pair, object order_size):
         """
         *required
         Get the minimum increment interval for order size (e.g. 0.01 USD)
         :return: Min order size increment in Decimal format
         """
         cdef:
-            TradingRule trading_rule = self._trading_rules[symbol]
+            TradingRule trading_rule = self._trading_rules[trading_pair]
 
         # Bitroyal is using the min_order_size as max_precision
         # Order size must be a multiple of the min_order_size
         return trading_rule.min_order_size
 
-    cdef object c_quantize_order_amount(self, str symbol, object amount, object price=s_decimal_0):
+    cdef object c_quantize_order_amount(self, str trading_pair, object amount, object price=s_decimal_0):
         """
         *required
         Check current order amount against trading rule, and correct any rule violations
         :return: Valid order amount in Decimal format
         """
         cdef:
-            TradingRule trading_rule = self._trading_rules[symbol]
+            TradingRule trading_rule = self._trading_rules[trading_pair]
 
         global s_decimal_0
-        quantized_amount = MarketBase.c_quantize_order_amount(self, symbol, amount)
+        quantized_amount = MarketBase.c_quantize_order_amount(self, trading_pair, amount)
 
         # Check against min_order_size. If not passing either check, return 0.
         if quantized_amount < trading_rule.min_order_size:

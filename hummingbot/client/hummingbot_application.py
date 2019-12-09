@@ -320,6 +320,7 @@ class HummingbotApplication(*commands):
 
                 market = BitroyalMarket(bitroyal_api_key,
                                         bitroyal_secret_key,
+                                        order_book_tracker_data_source_type=OrderBookTrackerDataSourceType.EXCHANGE_API,
                                         trading_pairs=trading_pairs,
                                         trading_required=self._trading_required)
 

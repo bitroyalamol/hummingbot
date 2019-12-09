@@ -28,7 +28,7 @@ from hummingbot.core.data_type.order_book_tracker_entry import (
 from hummingbot.core.data_type.order_book_message import OrderBookMessage
 from hummingbot.market.bitroyal.bitroyal_active_order_tracker import BitroyalActiveOrderTracker
 
-BITROYAL_REST_URL = "https://apicoinmartprod.alphapoint.com:8443/API"
+BITROYAL_REST_URL = "https://apicoinmartprod.alphapoint.com:8443/AP"
 BITROYAL_WS_FEED = "wss://apicoinmartprod.alphapoint.com/WSGateway"
 MAX_RETRIES = 20
 NaN = float("nan")
