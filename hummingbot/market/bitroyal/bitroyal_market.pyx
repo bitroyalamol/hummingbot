@@ -5,6 +5,7 @@ from decimal import Decimal
 import json
 import logging
 import pandas as pd
+import re
 import time
 from typing import (
     Any,
@@ -12,6 +13,7 @@ from typing import (
     List,
     Optional,
     AsyncIterable,
+    Tuple,
 )
 from libc.stdint cimport int64_t
 
@@ -58,6 +60,7 @@ from hummingbot.market.bitroyal.bitroyal_in_flight_order cimport BitroyalInFligh
 s_logger = None
 s_decimal_0 = Decimal(0)
 s_decimal_nan = Decimal("nan")
+TRADING_PAIR_SPLITTER = re.compile(r"^(\w+)(BTC|EOS|XRP|IOTA|ETH|BCH|XLM|XMR|LTC|EUR|USD|GBP|INR)$")
 
 cdef class BitroyalMarketTransactionTracker(TransactionTracker):
     cdef:
@@ -134,10 +137,8 @@ cdef class BitroyalMarket(MarketBase):
         super().__init__()
         self._trading_required = trading_required
         self._bitroyal_auth = BitroyalAuth(bitroyal_api_key, bitroyal_secret_key)
-        self._order_book_tracker = BitroyalOrderBookTracker(data_source_type=order_book_tracker_data_source_type,
-                                                               trading_pairs=trading_pairs)
-        self._user_stream_tracker = BitroyalUserStreamTracker(bitroyal_auth=self._bitroyal_auth,
-                                                                 trading_pairs=trading_pairs)
+        self._order_book_tracker = BitroyalOrderBookTracker(data_source_type=order_book_tracker_data_source_type, trading_pairs=trading_pairs)
+        self._user_stream_tracker = BitroyalUserStreamTracker(bitroyal_auth=self._bitroyal_auth, trading_pairs=trading_pairs)
         self._ev_loop = asyncio.get_event_loop()
         self._poll_notifier = asyncio.Event()
         self._last_timestamp = 0

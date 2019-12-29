@@ -72,7 +72,6 @@ def start(self):
         except ValueError as e:
             self._notify(str(e))
             return
-
         market_names: List[Tuple[str, List[str]]] = [(maker_market, [trading_pair])]
 
         self._initialize_wallet(token_trading_pairs=list(set(maker_assets)))
