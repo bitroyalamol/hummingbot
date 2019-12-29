@@ -165,7 +165,7 @@ cdef class BitroyalMarket(MarketBase):
     @staticmethod
     def convert_from_exchange_trading_pair(exchange_trading_pair: str) -> str:
         # Bitroyal does not split BASEQUOTE (BTCUSDT)
-        base_asset, quote_asset = BinanceMarket.split_trading_pair(exchange_trading_pair)
+        base_asset, quote_asset = BitroyalMarket.split_trading_pair(exchange_trading_pair)
         return f"{base_asset}-{quote_asset}"
 
     @staticmethod
