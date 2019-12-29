@@ -154,6 +154,25 @@ cdef class BitroyalMarket(MarketBase):
         self._trading_rules_polling_task = None
         self._shared_client = None
 
+    @staticmethod
+    def split_trading_pair(trading_pair: str) -> Tuple[str, str]:
+        try:
+            m = TRADING_PAIR_SPLITTER.match(trading_pair)
+            return m.group(1), m.group(2)
+        except Exception as e:
+            raise ValueError(f"Error parsing trading_pair {trading_pair}: {str(e)}")
+
+    @staticmethod
+    def convert_from_exchange_trading_pair(exchange_trading_pair: str) -> str:
+        # Bitroyal does not split BASEQUOTE (BTCUSDT)
+        base_asset, quote_asset = BinanceMarket.split_trading_pair(exchange_trading_pair)
+        return f"{base_asset}-{quote_asset}"
+
+    @staticmethod
+    def convert_to_exchange_trading_pair(hb_trading_pair: str) -> str:
+        # Bitroyal does not split BASEQUOTE (BTCUSDT)
+        return hb_trading_pair.replace("-", "")
+
     @property
     def name(self) -> str:
         """
